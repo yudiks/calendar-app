@@ -1,3 +1,4 @@
+// Serves the static calendar app from /public on PORT (default 3000).
 const express = require('express');
 const path = require('path');
 

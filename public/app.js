@@ -6,23 +6,39 @@
   const DAYS_SHORT = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
 
   let current = { year: new Date().getFullYear(), month: new Date().getMonth() };
-  let editingId = null;
+  let editingId = null; // null = new event; string UUID = editing existing
 
   // ── Persistence ────────────────────────────────────────────────────────────
+
+  /** @returns {Array<{id:string, title:string, date:string, time:string, color:string}>} */
   function loadEvents() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
     catch { return []; }
   }
+
+  /** @param {ReturnType<typeof loadEvents>} events */
   function saveEvents(events) {
     localStorage.setItem(STORE_KEY, JSON.stringify(events));
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
+
+  /**
+   * Formats a calendar date as an ISO date string (YYYY-MM-DD).
+   * @param {number} y - Full year
+   * @param {number} m - 0-based month
+   * @param {number} d - Day of month
+   * @returns {string}
+   */
   function toDateStr(y, m, d) {
     return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
   }
 
-  // ISO week number (Mon-based)
+  /**
+   * Returns the ISO 8601 week number for a given date (weeks start on Monday).
+   * @param {Date} date
+   * @returns {number}
+   */
   function isoWeek(date) {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
@@ -30,7 +46,13 @@
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
   }
 
-  // Build Mon-based grid cells
+  /**
+   * Builds the flat array of day cells for a month grid (Monday-first).
+   * Pads the start and end with days from adjacent months to fill complete weeks.
+   * @param {number} year
+   * @param {number} month - 0-based
+   * @returns {Array<{date: Date, curMonth: boolean}>}
+   */
   function buildCells(year, month) {
     const firstDate = new Date(year, month, 1);
     const firstDow = (firstDate.getDay() + 6) % 7; // Mon=0…Sun=6
@@ -60,6 +82,10 @@
   const gridBody   = document.getElementById('gridBody');
   const monthTitle = document.getElementById('monthTitle');
 
+  /**
+   * Re-renders the full month grid and header from the current `current` state.
+   * Reads events from localStorage on each call so the view stays in sync after saves.
+   */
   function renderGrid() {
     const { year, month } = current;
     monthTitle.textContent = `${MONTHS[month]} ${year}`;
@@ -71,7 +97,7 @@
 
     const cells = buildCells(year, month);
 
-    // Header row
+    // Header row: spacer + 7 columns showing day name and the date of the first-row cell
     gridHeader.innerHTML = '';
     const spacer = document.createElement('div');
     spacer.className = 'gh-spacer';
@@ -146,8 +172,13 @@
   // ── Mini calendar ──────────────────────────────────────────────────────────
   const miniMonthTitle = document.getElementById('miniMonthTitle');
   const miniDays       = document.getElementById('miniDays');
+  // Mini calendar has its own navigation state, independent of the main grid.
   let mini = { ...current };
 
+  /**
+   * Re-renders the sidebar mini calendar for the `mini` month.
+   * Clicking a day jumps both the main grid and mini calendar to that month.
+   */
   function renderMini() {
     const { year, month } = mini;
     miniMonthTitle.textContent = `${MONTHS[month]} ${year}`;
@@ -203,6 +234,11 @@
   const dateErr    = document.getElementById('dateErr');
   const deleteBtn  = document.getElementById('deleteBtn');
 
+  /**
+   * Opens the event modal, pre-filled for either a new event or an existing one.
+   * @param {string} dateStr - ISO date string for the clicked day (YYYY-MM-DD)
+   * @param {object|null} event - Existing event object to edit, or null to create new
+   */
   function openModal(dateStr, event) {
     editingId = event ? event.id : null;
     titleInput.value = event ? event.title : '';
@@ -216,6 +252,7 @@
     setTimeout(() => titleInput.focus(), 50);
   }
 
+  /** Closes the modal and resets form state. */
   function closeModal() {
     backdrop.classList.add('hidden');
     form.reset();
