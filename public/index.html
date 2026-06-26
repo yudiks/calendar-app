@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendar</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="app">
+    <header class="cal-header">
+      <button class="nav-btn" id="prev">&#8249;</button>
+      <h1 class="month-title" id="monthTitle"></h1>
+      <button class="nav-btn" id="next">&#8250;</button>
+    </header>
+
+    <div class="weekday-labels">
+      <span>Sun</span><span>Mon</span><span>Tue</span>
+      <span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-backdrop hidden" id="backdrop">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle">Add Event</h2>
+      <form id="eventForm" novalidate>
+        <label>
+          Title <span class="req">*</span>
+          <input type="text" id="evtTitle" maxlength="80" placeholder="Event title" />
+          <span class="err hidden" id="titleErr">Title is required.</span>
+        </label>
+        <label>
+          Date <span class="req">*</span>
+          <input type="date" id="evtDate" />
+          <span class="err hidden" id="dateErr">Date is required.</span>
+        </label>
+        <label>
+          Time
+          <input type="time" id="evtTime" />
+        </label>
+        <div class="modal-actions">
+          <button type="submit" class="btn-primary">Save</button>
+          <button type="button" class="btn-ghost" id="deleteBtn">Delete</button>
+          <button type="button" class="btn-ghost" id="cancelBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
