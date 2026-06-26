@@ -1,138 +1,219 @@
 (() => {
   // ── State ──────────────────────────────────────────────────────────────────
   const STORE_KEY = 'calendar-events';
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const DAYS_SHORT = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+
   let current = { year: new Date().getFullYear(), month: new Date().getMonth() };
-  let editingId = null; // null = new event, string = editing existing
+  let editingId = null;
 
   // ── Persistence ────────────────────────────────────────────────────────────
   function loadEvents() {
     try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
     catch { return []; }
   }
-
   function saveEvents(events) {
     localStorage.setItem(STORE_KEY, JSON.stringify(events));
   }
 
-  // ── Grid rendering ─────────────────────────────────────────────────────────
-  const grid = document.getElementById('grid');
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function toDateStr(y, m, d) {
+    return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  }
+
+  // ISO week number (Mon-based)
+  function isoWeek(date) {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  }
+
+  // Build Mon-based grid cells
+  function buildCells(year, month) {
+    const firstDate = new Date(year, month, 1);
+    const firstDow = (firstDate.getDay() + 6) % 7; // Mon=0…Sun=6
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrev  = new Date(year, month, 0).getDate();
+    const cells = [];
+    for (let i = firstDow - 1; i >= 0; i--) {
+      cells.push({ date: new Date(year, month - 1, daysInPrev - i), curMonth: false });
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      cells.push({ date: new Date(year, month, d), curMonth: true });
+    }
+    const rem = cells.length % 7;
+    if (rem !== 0) {
+      for (let d = 1; d <= 7 - rem; d++) {
+        cells.push({ date: new Date(year, month + 1, d), curMonth: false });
+      }
+    }
+    return cells;
+  }
+
+  // ── Logo date ──────────────────────────────────────────────────────────────
+  document.getElementById('logoDate').textContent = new Date().getDate();
+
+  // ── Main grid render ───────────────────────────────────────────────────────
+  const gridHeader = document.getElementById('gridHeader');
+  const gridBody   = document.getElementById('gridBody');
   const monthTitle = document.getElementById('monthTitle');
-  const MONTHS = ['January','February','March','April','May','June',
-                  'July','August','September','October','November','December'];
 
   function renderGrid() {
     const { year, month } = current;
     monthTitle.textContent = `${MONTHS[month]} ${year}`;
 
-    const today = new Date();
-    const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const daysInPrev = new Date(year, month, 0).getDate();
+    const today = new Date(); today.setHours(0,0,0,0);
     const events = loadEvents();
-
-    // Build a map: "YYYY-MM-DD" → [event, …]
     const byDate = {};
-    events.forEach(ev => {
-      (byDate[ev.date] = byDate[ev.date] || []).push(ev);
+    events.forEach(ev => { (byDate[ev.date] = byDate[ev.date] || []).push(ev); });
+
+    const cells = buildCells(year, month);
+
+    // Header row
+    gridHeader.innerHTML = '';
+    const spacer = document.createElement('div');
+    spacer.className = 'gh-spacer';
+    gridHeader.appendChild(spacer);
+
+    DAYS_SHORT.forEach((name, i) => {
+      const cellDate = cells[i].date;
+      const isToday = cellDate.getTime() === today.getTime();
+      const col = document.createElement('div');
+      col.className = 'gh-day';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'gh-day-name';
+      nameEl.textContent = name;
+      const numEl = document.createElement('div');
+      numEl.className = 'gh-day-num' + (isToday ? ' today-num' : '');
+      numEl.textContent = cellDate.getDate();
+      col.appendChild(nameEl);
+      col.appendChild(numEl);
+      gridHeader.appendChild(col);
     });
 
-    const cells = [];
+    // Week rows
+    gridBody.innerHTML = '';
+    for (let w = 0; w < cells.length / 7; w++) {
+      const week = cells.slice(w * 7, w * 7 + 7);
+      const row = document.createElement('div');
+      row.className = 'grid-week';
 
-    // Trailing days from previous month
-    for (let i = firstDay - 1; i >= 0; i--) {
-      cells.push({ day: daysInPrev - i, curMonth: false });
-    }
-    // Current month
-    for (let d = 1; d <= daysInMonth; d++) {
-      cells.push({ day: d, curMonth: true });
-    }
-    // Leading days of next month to fill last row
-    const remainder = cells.length % 7;
-    if (remainder !== 0) {
-      for (let d = 1; d <= 7 - remainder; d++) {
-        cells.push({ day: d, curMonth: false });
-      }
-    }
+      const wn = document.createElement('div');
+      wn.className = 'week-num';
+      wn.textContent = isoWeek(week[0].date);
+      row.appendChild(wn);
 
-    grid.innerHTML = '';
-    cells.forEach(({ day, curMonth }) => {
-      const dateStr = curMonth
-        ? toDateStr(year, month, day)
-        : null; // don't attach events to padding cells
+      week.forEach(({ date, curMonth }) => {
+        const ds = toDateStr(date.getFullYear(), date.getMonth(), date.getDate());
+        const isToday = date.getTime() === today.getTime();
 
-      const isToday = curMonth
-        && today.getFullYear() === year
-        && today.getMonth() === month
-        && today.getDate() === day;
+        const cell = document.createElement('div');
+        cell.className = 'day-cell' + (curMonth ? '' : ' other-month');
+        cell.addEventListener('click', () => openModal(ds, null));
 
-      const cell = document.createElement('div');
-      cell.className = 'day' + (curMonth ? '' : ' other-month') + (isToday ? ' today' : '');
+        const num = document.createElement('div');
+        num.className = 'day-cell-num' + (isToday ? ' today' : '');
+        num.textContent = date.getDate();
+        num.addEventListener('click', e => { e.stopPropagation(); openModal(ds, null); });
+        cell.appendChild(num);
 
-      const num = document.createElement('div');
-      num.className = 'day-num';
-      num.textContent = day;
-      cell.appendChild(num);
+        (byDate[ds] || []).forEach(ev => {
+          const pill = document.createElement('div');
+          pill.className = 'event-pill';
 
-      if (curMonth) {
-        // Event badges
-        (byDate[dateStr] || []).forEach(ev => {
-          const badge = document.createElement('span');
-          badge.className = 'event-badge';
-          badge.textContent = ev.time ? `${ev.time} ${ev.title}` : ev.title;
-          badge.addEventListener('click', e => {
-            e.stopPropagation();
-            openModal(dateStr, ev);
-          });
-          cell.appendChild(badge);
+          const dot = document.createElement('span');
+          dot.className = 'event-dot';
+          dot.style.background = ev.color || '#4285f4';
+
+          const label = document.createElement('span');
+          label.className = 'event-pill-label';
+          label.textContent = ev.time ? `${ev.time} ${ev.title}` : ev.title;
+
+          pill.appendChild(dot);
+          pill.appendChild(label);
+          pill.addEventListener('click', e => { e.stopPropagation(); openModal(ds, ev); });
+          cell.appendChild(pill);
         });
 
-        cell.addEventListener('click', () => openModal(dateStr, null));
-      }
+        row.appendChild(cell);
+      });
+      gridBody.appendChild(row);
+    }
+  }
 
-      grid.appendChild(cell);
+  // ── Mini calendar ──────────────────────────────────────────────────────────
+  const miniMonthTitle = document.getElementById('miniMonthTitle');
+  const miniDays       = document.getElementById('miniDays');
+  let mini = { ...current };
+
+  function renderMini() {
+    const { year, month } = mini;
+    miniMonthTitle.textContent = `${MONTHS[month]} ${year}`;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cells = buildCells(year, month);
+    miniDays.innerHTML = '';
+    cells.forEach(({ date, curMonth }) => {
+      const isToday = date.getTime() === today.getTime();
+      const el = document.createElement('div');
+      el.className = 'mini-day' + (isToday ? ' today' : '') + (!curMonth ? ' other' : '');
+      el.textContent = date.getDate();
+      el.addEventListener('click', () => {
+        current = { year: date.getFullYear(), month: date.getMonth() };
+        mini = { ...current };
+        renderGrid(); renderMini();
+      });
+      miniDays.appendChild(el);
     });
   }
 
-  function toDateStr(year, month, day) {
-    return `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-  }
+  document.getElementById('miniPrev').addEventListener('click', () => {
+    if (mini.month === 0) { mini.month = 11; mini.year--; } else mini.month--;
+    renderMini();
+  });
+  document.getElementById('miniNext').addEventListener('click', () => {
+    if (mini.month === 11) { mini.month = 0; mini.year++; } else mini.month++;
+    renderMini();
+  });
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   document.getElementById('prev').addEventListener('click', () => {
-    if (current.month === 0) { current.month = 11; current.year--; }
-    else { current.month--; }
-    renderGrid();
+    if (current.month === 0) { current.month = 11; current.year--; } else current.month--;
+    mini = { ...current }; renderGrid(); renderMini();
   });
-
   document.getElementById('next').addEventListener('click', () => {
-    if (current.month === 11) { current.month = 0; current.year++; }
-    else { current.month++; }
-    renderGrid();
+    if (current.month === 11) { current.month = 0; current.year++; } else current.month++;
+    mini = { ...current }; renderGrid(); renderMini();
+  });
+  document.getElementById('todayBtn').addEventListener('click', () => {
+    const t = new Date();
+    current = { year: t.getFullYear(), month: t.getMonth() };
+    mini = { ...current }; renderGrid(); renderMini();
   });
 
   // ── Modal ──────────────────────────────────────────────────────────────────
-  const backdrop  = document.getElementById('backdrop');
-  const modalTitle = document.getElementById('modalTitle');
-  const form      = document.getElementById('eventForm');
+  const backdrop   = document.getElementById('backdrop');
+  const form       = document.getElementById('eventForm');
   const titleInput = document.getElementById('evtTitle');
   const dateInput  = document.getElementById('evtDate');
   const timeInput  = document.getElementById('evtTime');
-  const titleErr  = document.getElementById('titleErr');
-  const dateErr   = document.getElementById('dateErr');
-  const deleteBtn = document.getElementById('deleteBtn');
-  const cancelBtn = document.getElementById('cancelBtn');
+  const colorSel   = document.getElementById('evtColor');
+  const titleErr   = document.getElementById('titleErr');
+  const dateErr    = document.getElementById('dateErr');
+  const deleteBtn  = document.getElementById('deleteBtn');
 
   function openModal(dateStr, event) {
     editingId = event ? event.id : null;
-    modalTitle.textContent = event ? 'Edit Event' : 'Add Event';
     titleInput.value = event ? event.title : '';
     dateInput.value  = event ? event.date  : (dateStr || '');
-    timeInput.value  = event ? event.time  : '';
+    timeInput.value  = event ? (event.time || '') : '';
+    colorSel.value   = event ? (event.color || '#4285f4') : '#4285f4';
     titleErr.classList.add('hidden');
     dateErr.classList.add('hidden');
-    deleteBtn.style.display = event ? '' : 'none';
+    deleteBtn.classList.toggle('hidden', !event);
     backdrop.classList.remove('hidden');
-    titleInput.focus();
+    setTimeout(() => titleInput.focus(), 50);
   }
 
   function closeModal() {
@@ -141,49 +222,48 @@
     editingId = null;
   }
 
-  cancelBtn.addEventListener('click', closeModal);
+  document.getElementById('cancelBtn').addEventListener('click', closeModal);
+  document.getElementById('cancelBtn2').addEventListener('click', closeModal);
   backdrop.addEventListener('click', e => { if (e.target === backdrop) closeModal(); });
-
-  // Keyboard close
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  document.getElementById('createBtn').addEventListener('click', () => {
+    const t = new Date();
+    openModal(toDateStr(t.getFullYear(), t.getMonth(), t.getDate()), null);
+  });
+
   form.addEventListener('submit', e => {
     e.preventDefault();
     const title = titleInput.value.trim();
     const date  = dateInput.value;
     let valid = true;
-
     if (!title) { titleErr.classList.remove('hidden'); valid = false; }
-    else         { titleErr.classList.add('hidden'); }
-
+    else          titleErr.classList.add('hidden');
     if (!date)  { dateErr.classList.remove('hidden'); valid = false; }
-    else        { dateErr.classList.add('hidden'); }
-
+    else          dateErr.classList.add('hidden');
     if (!valid) return;
 
     let events = loadEvents();
     if (editingId) {
       events = events.map(ev => ev.id === editingId
-        ? { ...ev, title, date, time: timeInput.value }
+        ? { ...ev, title, date, time: timeInput.value, color: colorSel.value }
         : ev);
     } else {
-      events.push({ id: crypto.randomUUID(), title, date, time: timeInput.value });
+      events.push({ id: crypto.randomUUID(), title, date, time: timeInput.value, color: colorSel.value });
     }
     saveEvents(events);
     closeModal();
     renderGrid();
   });
 
-  // ── Delete ─────────────────────────────────────────────────────────────────
   deleteBtn.addEventListener('click', () => {
     if (!editingId) return;
-    const events = loadEvents().filter(ev => ev.id !== editingId);
-    saveEvents(events);
+    saveEvents(loadEvents().filter(ev => ev.id !== editingId));
     closeModal();
     renderGrid();
   });
 
   // ── Boot ───────────────────────────────────────────────────────────────────
   renderGrid();
+  renderMini();
 })();
