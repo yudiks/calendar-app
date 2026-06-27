@@ -195,6 +195,7 @@ body {
 .grid-body {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 .grid-week {
   display: grid;
