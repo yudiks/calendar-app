@@ -4,16 +4,23 @@
   const MONTHS = ['January','February','March','April','May','June',
                   'July','August','September','October','November','December'];
   const DAYS_SHORT = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const ALLOWED_COLORS = new Set(['#4285f4','#0b8043','#e67c73','#f6bf26','#8e24aa']);
 
-  let current = { year: new Date().getFullYear(), month: new Date().getMonth() };
+  const _now = new Date();
+  let current = { year: _now.getFullYear(), month: _now.getMonth() };
   let editingId = null; // null = new event; string UUID = editing existing
 
   // ── Persistence ────────────────────────────────────────────────────────────
 
   /** @returns {Array<{id:string, title:string, date:string, time:string, color:string}>} */
   function loadEvents() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
-    catch { return []; }
+    try {
+      const raw = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (!Array.isArray(raw)) return [];
+      return raw.filter(ev =>
+        ev && typeof ev.id === 'string' && typeof ev.title === 'string' && typeof ev.date === 'string'
+      );
+    } catch { return []; }
   }
 
   /** @param {ReturnType<typeof loadEvents>} events */
@@ -151,7 +158,7 @@
 
           const dot = document.createElement('span');
           dot.className = 'event-dot';
-          dot.style.background = ev.color || '#4285f4';
+          dot.style.background = ALLOWED_COLORS.has(ev.color) ? ev.color : '#4285f4';
 
           const label = document.createElement('span');
           label.className = 'event-pill-label';
