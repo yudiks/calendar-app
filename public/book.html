@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Book a meeting with Yudi</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Google Sans", Roboto, Arial, sans-serif;
+      background: #f1f3f4;
+      color: #3c4043;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 64px;
+    }
+
+    /* ── Logo / header ── */
+    .page-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+    }
+    .page-logo-icon {
+      width: 40px; height: 40px;
+      background: #4285f4;
+      color: #fff;
+      border-radius: 8px;
+      font-size: 1.25rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .page-logo-text {
+      font-size: 1.1rem;
+      color: #5f6368;
+      font-weight: 400;
+    }
+    .page-logo-text strong {
+      color: #3c4043;
+      font-weight: 500;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(60,64,67,.2), 0 4px 8px rgba(60,64,67,.1);
+      width: 100%;
+      max-width: 480px;
+      overflow: hidden;
+    }
+
+    .card-section {
+      padding: 24px;
+      border-bottom: 1px solid #dadce0;
+    }
+    .card-section:last-child { border-bottom: none; }
+
+    .section-label {
+      font-size: .75rem;
+      font-weight: 500;
+      color: #5f6368;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 12px;
+    }
+
+    /* ── Date input ── */
+    .date-input-wrap { display: flex; align-items: center; gap: 12px; }
+    .date-input-wrap svg { color: #5f6368; flex-shrink: 0; }
+    input[type="date"] {
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: .9375rem;
+      font-family: inherit;
+      color: #3c4043;
+      background: #fff;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .15s;
+      flex: 1;
+    }
+    input[type="date"]:focus { border-color: #4285f4; }
+
+    /* ── Slots ── */
+    .slots-state {
+      font-size: .875rem;
+      color: #5f6368;
+      text-align: center;
+      padding: 8px 0;
+    }
+    .slots-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .slot-btn {
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      background: #fff;
+      color: #3c4043;
+      font-family: inherit;
+      font-size: .875rem;
+      font-weight: 500;
+      padding: 10px 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: border-color .15s, background .15s, color .15s;
+    }
+    .slot-btn:hover:not(.unavailable):not(.selected) {
+      border-color: #4285f4;
+      background: #e8f0fe;
+      color: #1a73e8;
+    }
+    .slot-btn.selected {
+      background: #4285f4;
+      border-color: #4285f4;
+      color: #fff;
+    }
+    .slot-btn.unavailable {
+      background: #f1f3f4;
+      color: #b0b6be;
+      cursor: default;
+      border-color: #e8eaed;
+    }
+
+    /* ── Details form ── */
+    .details-section { display: none; }
+    .details-section.visible { display: block; }
+
+    .field-group { margin-bottom: 16px; }
+    .field-group:last-child { margin-bottom: 0; }
+    .field-label {
+      display: block;
+      font-size: .8125rem;
+      font-weight: 500;
+      color: #3c4043;
+      margin-bottom: 6px;
+    }
+    .field-input {
+      width: 100%;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      padding: 10px 12px;
+      font-size: .9375rem;
+      font-family: inherit;
+      color: #3c4043;
+      background: #fff;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field-input:focus { border-color: #4285f4; }
+    .field-input::placeholder { color: #b0b6be; }
+
+    .err-msg {
+      font-size: .75rem;
+      color: #d93025;
+      margin-top: 4px;
+      display: none;
+    }
+    .err-msg.visible { display: block; }
+
+    /* ── Submit button ── */
+    .submit-btn {
+      width: 100%;
+      background: #4285f4;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: .9375rem;
+      font-family: inherit;
+      font-weight: 500;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: background .15s;
+    }
+    .submit-btn:hover { background: #1a73e8; }
+    .submit-btn:disabled {
+      background: #dadce0;
+      color: #9aa0a6;
+      cursor: default;
+    }
+
+    /* ── Confirmation ── */
+    .confirm-section {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 48px 24px;
+    }
+    .confirm-section.visible { display: flex; }
+    .confirm-icon {
+      width: 64px; height: 64px;
+      background: #e6f4ea;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 20px;
+    }
+    .confirm-icon svg { color: #1e8e3e; }
+    .confirm-title {
+      font-size: 1.25rem;
+      font-weight: 500;
+      color: #3c4043;
+      margin-bottom: 10px;
+    }
+    .confirm-subtitle {
+      font-size: .9375rem;
+      color: #5f6368;
+      line-height: 1.5;
+    }
+    .confirm-detail {
+      margin-top: 20px;
+      background: #f8f9fa;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      width: 100%;
+      text-align: left;
+    }
+    .confirm-detail-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .875rem;
+      color: #3c4043;
+      padding: 4px 0;
+    }
+    .confirm-detail-row svg { color: #5f6368; flex-shrink: 0; }
+
+    /* ── General error banner ── */
+    .error-banner {
+      background: #fce8e6;
+      border: 1px solid #f5c6c2;
+      border-radius: 6px;
+      color: #d93025;
+      font-size: .875rem;
+      padding: 10px 14px;
+      margin-top: 12px;
+      display: none;
+    }
+    .error-banner.visible { display: block; }
+
+    /* ── Responsive ── */
+    @media (max-width: 520px) {
+      body { padding: 20px 12px 48px; }
+      .slots-grid { grid-template-columns: repeat(2, 1fr); }
+      .page-logo-text { font-size: .9375rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Logo -->
+  <div class="page-logo">
+    <div class="page-logo-icon">📅</div>
+    <div class="page-logo-text">Book a meeting with <strong>Yudi</strong></div>
+  </div>
+
+  <!-- Card -->
+  <div class="card">
+
+    <!-- Confirmation (hidden until success) -->
+    <div class="confirm-section" id="confirmSection">
+      <div class="confirm-icon">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="confirm-title">You're booked!</div>
+      <div class="confirm-subtitle">Check your email for a confirmation and calendar invite.</div>
+      <div class="confirm-detail" id="confirmDetail"></div>
+    </div>
+
+    <!-- Booking form (shown until success) -->
+    <div id="bookingForm">
+
+      <!-- Step 1: Pick a date -->
+      <div class="card-section">
+        <div class="section-label">Select a date</div>
+        <div class="date-input-wrap">
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.11-.89-2-2-2zm0 16H5V8h14v11z"/>
+          </svg>
+          <input type="date" id="dateInput" />
+        </div>
+      </div>
+
+      <!-- Step 2: Pick a time slot -->
+      <div class="card-section" id="slotsSection">
+        <div class="section-label">Available times</div>
+        <div class="slots-state" id="slotsState">Choose a date to see available slots.</div>
+        <div class="slots-grid" id="slotsGrid" style="display:none"></div>
+      </div>
+
+      <!-- Step 3: Fill in details -->
+      <div class="card-section details-section" id="detailsSection">
+        <div class="section-label">Your details</div>
+
+        <div class="field-group">
+          <label class="field-label" for="nameInput">Name</label>
+          <input class="field-input" type="text" id="nameInput" placeholder="Your full name" autocomplete="name" />
+          <div class="err-msg" id="nameErr">Please enter your name.</div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="emailInput">Email</label>
+          <input class="field-input" type="email" id="emailInput" placeholder="you@example.com" autocomplete="email" />
+          <div class="err-msg" id="emailErr">Please enter a valid email address.</div>
+        </div>
+
+        <div class="error-banner" id="errorBanner"></div>
+
+        <button class="submit-btn" id="submitBtn">Confirm booking</button>
+      </div>
+
+    </div><!-- /bookingForm -->
+  </div><!-- /card -->
+
+<script>
+  (() => {
+    const dateInput    = document.getElementById('dateInput');
+    const slotsState   = document.getElementById('slotsState');
+    const slotsGrid    = document.getElementById('slotsGrid');
+    const detailsSection = document.getElementById('detailsSection');
+    const nameInput    = document.getElementById('nameInput');
+    const emailInput   = document.getElementById('emailInput');
+    const nameErr      = document.getElementById('nameErr');
+    const emailErr     = document.getElementById('emailErr');
+    const errorBanner  = document.getElementById('errorBanner');
+    const submitBtn    = document.getElementById('submitBtn');
+    const bookingForm  = document.getElementById('bookingForm');
+    const confirmSection = document.getElementById('confirmSection');
+    const confirmDetail  = document.getElementById('confirmDetail');
+
+    // Set min date to today (YYYY-MM-DD in local time)
+    const todayLocal = (() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    })();
+    dateInput.min = todayLocal;
+
+    let selectedSlot = null;
+
+    // ── Fetch and render slots ──────────────────────────────────────────────
+    dateInput.addEventListener('change', async () => {
+      const date = dateInput.value;
+      if (!date) return;
+
+      // Reset slot + details state
+      selectedSlot = null;
+      detailsSection.classList.remove('visible');
+      slotsGrid.innerHTML = '';
+      slotsGrid.style.display = 'none';
+      slotsState.style.display = 'block';
+      slotsState.textContent = 'Loading available slots…';
+
+      try {
+        const res = await fetch(`/api/slots?date=${encodeURIComponent(date)}`);
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        const data = await res.json();
+        renderSlots(data.slots ?? data, date);
+      } catch (err) {
+        slotsState.textContent = 'Could not load slots. Please try again.';
+        console.error(err);
+      }
+    });
+
+    function renderSlots(slots, date) {
+      if (!Array.isArray(slots) || slots.length === 0) {
+        slotsState.textContent = 'No available slots for this date.';
+        slotsGrid.style.display = 'none';
+        return;
+      }
+
+      slotsState.style.display = 'none';
+      slotsGrid.style.display = 'grid';
+      slotsGrid.innerHTML = '';
+
+      slots.forEach(slot => {
+        const btn = document.createElement('button');
+        btn.className = 'slot-btn' + (slot.available === false ? ' unavailable' : '');
+        btn.textContent = formatTime(slot.time ?? slot);
+        btn.dataset.time = slot.time ?? slot;
+        btn.disabled = slot.available === false;
+
+        if (slot.available !== false) {
+          btn.addEventListener('click', () => selectSlot(btn, date));
+        }
+
+        slotsGrid.appendChild(btn);
+      });
+    }
+
+    function selectSlot(btn, date) {
+      // Deselect previous
+      slotsGrid.querySelectorAll('.slot-btn.selected').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedSlot = { date, time: btn.dataset.time };
+      detailsSection.classList.add('visible');
+      detailsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      hideError();
+    }
+
+    // ── Form submission ─────────────────────────────────────────────────────
+    submitBtn.addEventListener('click', async () => {
+      const name  = nameInput.value.trim();
+      const email = emailInput.value.trim();
+      let valid = true;
+
+      nameErr.classList.remove('visible');
+      emailErr.classList.remove('visible');
+      hideError();
+
+      if (!name) { nameErr.classList.add('visible'); valid = false; }
+      if (!email || !isValidEmail(email)) { emailErr.classList.add('visible'); valid = false; }
+      if (!valid) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Booking…';
+
+      try {
+        const res = await fetch('/api/book', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            email,
+            date: selectedSlot.date,
+            time: selectedSlot.time,
+          }),
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || body.message || `Booking failed (${res.status})`);
+        }
+
+        showConfirmation(name, email, selectedSlot.date, selectedSlot.time);
+      } catch (err) {
+        showError(err.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirm booking';
+      }
+    });
+
+    // ── Confirmation screen ─────────────────────────────────────────────────
+    function showConfirmation(name, email, date, time) {
+      bookingForm.style.display = 'none';
+      confirmSection.classList.add('visible');
+
+      const friendly = new Date(`${date}T00:00:00`).toLocaleDateString('en-US', {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
+
+      confirmDetail.innerHTML = `
+        <div class="confirm-detail-row">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+          <span>${escHtml(name)}</span>
+        </div>
+        <div class="confirm-detail-row">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+          <span>${escHtml(email)}</span>
+        </div>
+        <div class="confirm-detail-row">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-2 .89-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.11-.89-2-2-2zm0 16H5V8h14v11z"/></svg>
+          <span>${escHtml(friendly)}</span>
+        </div>
+        <div class="confirm-detail-row">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+          <span>${escHtml(formatTime(time))}</span>
+        </div>
+      `;
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────────
+    function formatTime(t) {
+      // Accept "HH:MM" or "HH:MM:SS"
+      if (!t) return t;
+      const [h, m] = t.split(':').map(Number);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hour = h % 12 || 12;
+      return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+
+    function isValidEmail(v) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+    }
+
+    function showError(msg) {
+      errorBanner.textContent = msg;
+      errorBanner.classList.add('visible');
+    }
+
+    function hideError() {
+      errorBanner.classList.remove('visible');
+      errorBanner.textContent = '';
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+  })();
+</script>
+</body>
+</html>
