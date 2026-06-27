@@ -9,6 +9,7 @@
   const _now = new Date();
   let current = { year: _now.getFullYear(), month: _now.getMonth() };
   let editingId = null; // null = new event; string UUID = editing existing
+  let googleEvents = []; // events fetched from Google Calendar API
 
   // ── Persistence ────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@
     monthTitle.textContent = `${MONTHS[month]} ${year}`;
 
     const today = new Date(); today.setHours(0,0,0,0);
-    const events = loadEvents();
+    const events = [...loadEvents(), ...googleEvents];
     const byDate = {};
     events.forEach(ev => { (byDate[ev.date] = byDate[ev.date] || []).push(ev); });
 
@@ -218,16 +219,16 @@
   // ── Navigation ─────────────────────────────────────────────────────────────
   document.getElementById('prev').addEventListener('click', () => {
     if (current.month === 0) { current.month = 11; current.year--; } else current.month--;
-    mini = { ...current }; renderGrid(); renderMini();
+    mini = { ...current }; renderGrid(); renderMini(); fetchGoogleEvents();
   });
   document.getElementById('next').addEventListener('click', () => {
     if (current.month === 11) { current.month = 0; current.year++; } else current.month++;
-    mini = { ...current }; renderGrid(); renderMini();
+    mini = { ...current }; renderGrid(); renderMini(); fetchGoogleEvents();
   });
   document.getElementById('todayBtn').addEventListener('click', () => {
     const t = new Date();
     current = { year: t.getFullYear(), month: t.getMonth() };
-    mini = { ...current }; renderGrid(); renderMini();
+    mini = { ...current }; renderGrid(); renderMini(); fetchGoogleEvents();
   });
 
   // ── Modal ──────────────────────────────────────────────────────────────────
@@ -307,7 +308,80 @@
     renderGrid();
   });
 
+  // ── Auth & Google Calendar ─────────────────────────────────────────────────
+
+  /**
+   * Updates the topbar-right area to show the logged-in user's avatar, name, and a sign-out button.
+   * @param {{name:string, email:string, picture:string}} me
+   */
+  function renderUserTopbar(me) {
+    const topbarRight = document.querySelector('.topbar-right');
+
+    const userInfo = document.createElement('div');
+    userInfo.style.cssText = 'display:flex;align-items:center;gap:8px;margin-left:8px;';
+
+    const avatar = document.createElement('img');
+    avatar.src = me.picture || '';
+    avatar.alt = me.name || me.email;
+    avatar.title = me.name || me.email;
+    avatar.style.cssText = 'width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;';
+    avatar.onerror = () => {
+      // Fallback: replace with initials circle
+      const initials = document.createElement('div');
+      const letter = (me.name || me.email || '?')[0].toUpperCase();
+      initials.style.cssText = 'width:32px;height:32px;border-radius:50%;background:#4285f4;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500;flex-shrink:0;';
+      initials.textContent = letter;
+      avatar.replaceWith(initials);
+    };
+
+    const nameEl = document.createElement('span');
+    nameEl.textContent = me.name || me.email;
+    nameEl.style.cssText = 'font-size:13px;color:#3c4043;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+
+    const signOutBtn = document.createElement('button');
+    signOutBtn.textContent = 'Sign out';
+    signOutBtn.className = 'icon-btn';
+    signOutBtn.style.cssText = 'font-size:12px;padding:4px 10px;border:1px solid #dadce0;border-radius:4px;color:#3c4043;white-space:nowrap;';
+    signOutBtn.addEventListener('click', async () => {
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.href = '/login.html';
+    });
+
+    userInfo.appendChild(avatar);
+    userInfo.appendChild(nameEl);
+    userInfo.appendChild(signOutBtn);
+    topbarRight.appendChild(userInfo);
+  }
+
+  /**
+   * Fetches Google Calendar events for the current month and re-renders the grid.
+   */
+  async function fetchGoogleEvents() {
+    try {
+      const res = await fetch(`/api/google-events?year=${current.year}&month=${current.month + 1}`);
+      if (res.ok) googleEvents = await res.json();
+      else googleEvents = [];
+    } catch { googleEvents = []; }
+    renderGrid();
+  }
+
+  /**
+   * Checks auth status on boot. Redirects to /login.html if not authenticated.
+   * On success, renders the topbar user info and fetches Google Calendar events.
+   */
+  async function boot() {
+    const meRes = await fetch('/api/me');
+    if (meRes.status === 401) {
+      window.location.href = '/login.html';
+      return;
+    }
+    const me = await meRes.json();
+    renderUserTopbar(me);
+    renderGrid();
+    renderMini();
+    fetchGoogleEvents();
+  }
+
   // ── Boot ───────────────────────────────────────────────────────────────────
-  renderGrid();
-  renderMini();
+  boot();
 })();
