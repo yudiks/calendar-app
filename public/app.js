@@ -8,6 +8,22 @@
 
   const _now = new Date();
   let current = { year: _now.getFullYear(), month: _now.getMonth() };
+
+  /**
+   * Returns the Monday of the week containing the given date.
+   * @param {Date} date
+   * @returns {Date}
+   */
+  function getMondayOf(date) {
+    const d = new Date(date);
+    const day = d.getDay(); // 0=Sun
+    const diff = (day === 0 ? -6 : 1 - day);
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  let currentWeekStart = getMondayOf(new Date()); // Monday of current week
   let editingId = null; // null = new event; string UUID = editing existing
   let googleEvents = []; // events fetched from Google Calendar API
 
@@ -91,86 +107,116 @@
   const monthTitle = document.getElementById('monthTitle');
 
   /**
-   * Re-renders the full month grid and header from the current `current` state.
+   * Creates an event pill element for the week view.
+   * @param {{id:string, title:string, date:string, time:string, color:string}} ev
+   * @param {string} ds - ISO date string for the cell
+   * @returns {HTMLElement}
+   */
+  function makePill(ev, ds) {
+    const pill = document.createElement('div');
+    pill.className = 'event-pill';
+    const dot = document.createElement('span');
+    dot.className = 'event-dot';
+    dot.style.background = ALLOWED_COLORS.has(ev.color) ? ev.color : '#4285f4';
+    const label = document.createElement('span');
+    label.className = 'event-pill-label';
+    label.textContent = ev.time ? `${ev.time} ${ev.title}` : ev.title;
+    pill.appendChild(dot);
+    pill.appendChild(label);
+    pill.addEventListener('click', e => { e.stopPropagation(); openModal(ds, ev); });
+    return pill;
+  }
+
+  /**
+   * Re-renders the weekly view from the current `currentWeekStart` state.
+   * Shows Mon–Sun columns with time rows from 7 AM to 9 PM.
    * Reads events from localStorage on each call so the view stays in sync after saves.
    */
   function renderGrid() {
-    const { year, month } = current;
-    monthTitle.textContent = `${MONTHS[month]} ${year}`;
-
     const today = new Date(); today.setHours(0,0,0,0);
     const events = [...loadEvents(), ...googleEvents];
+
+    // Build 7 dates: Mon through Sun
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(currentWeekStart);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+
+    // Update title to show week range e.g. "Jun 23 – Jun 29, 2026"
+    const fmt = d => `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`;
+    const start = days[0], end = days[6];
+    const yearLabel = start.getFullYear() === end.getFullYear() ? `, ${start.getFullYear()}` : '';
+    monthTitle.textContent = `${fmt(start)} – ${fmt(end)}${yearLabel}`;
+
+    // Group events by date string
     const byDate = {};
     events.forEach(ev => { (byDate[ev.date] = byDate[ev.date] || []).push(ev); });
 
-    const cells = buildCells(year, month);
-
-    // Header row: spacer + 7 columns showing day name and the date of the first-row cell
+    // --- Header row ---
     gridHeader.innerHTML = '';
     const spacer = document.createElement('div');
     spacer.className = 'gh-spacer';
     gridHeader.appendChild(spacer);
-
-    DAYS_SHORT.forEach((name, i) => {
-      const cellDate = cells[i].date;
-      const isToday = cellDate.getTime() === today.getTime();
+    days.forEach((date, i) => {
+      const ds = toDateStr(date.getFullYear(), date.getMonth(), date.getDate());
+      const isToday = date.getTime() === today.getTime();
       const col = document.createElement('div');
       col.className = 'gh-day';
       const nameEl = document.createElement('div');
       nameEl.className = 'gh-day-name';
-      nameEl.textContent = name;
+      nameEl.textContent = DAYS_SHORT[i];
       const numEl = document.createElement('div');
       numEl.className = 'gh-day-num' + (isToday ? ' today-num' : '');
-      numEl.textContent = cellDate.getDate();
+      numEl.textContent = date.getDate();
       col.appendChild(nameEl);
       col.appendChild(numEl);
+      col.addEventListener('click', () => openModal(ds, null));
       gridHeader.appendChild(col);
     });
 
-    // Week rows
+    // --- Body ---
     gridBody.innerHTML = '';
-    for (let w = 0; w < cells.length / 7; w++) {
-      const week = cells.slice(w * 7, w * 7 + 7);
+
+    // All-day row
+    const alldayRow = document.createElement('div');
+    alldayRow.className = 'week-allday-row';
+    const alldayLabel = document.createElement('div');
+    alldayLabel.className = 'time-label';
+    alldayLabel.textContent = 'All day';
+    alldayRow.appendChild(alldayLabel);
+    days.forEach(date => {
+      const ds = toDateStr(date.getFullYear(), date.getMonth(), date.getDate());
+      const cell = document.createElement('div');
+      cell.className = 'week-allday-cell';
+      (byDate[ds] || []).filter(ev => !ev.time).forEach(ev => {
+        cell.appendChild(makePill(ev, ds));
+      });
+      cell.addEventListener('click', () => openModal(ds, null));
+      alldayRow.appendChild(cell);
+    });
+    gridBody.appendChild(alldayRow);
+
+    // Time rows: 7 AM to 9 PM
+    for (let hour = 7; hour <= 21; hour++) {
       const row = document.createElement('div');
-      row.className = 'grid-week';
+      row.className = 'week-time-row';
 
-      const wn = document.createElement('div');
-      wn.className = 'week-num';
-      wn.textContent = isoWeek(week[0].date);
-      row.appendChild(wn);
+      const label = document.createElement('div');
+      label.className = 'time-label';
+      label.textContent = hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`;
+      row.appendChild(label);
 
-      week.forEach(({ date, curMonth }) => {
+      days.forEach(date => {
         const ds = toDateStr(date.getFullYear(), date.getMonth(), date.getDate());
-        const isToday = date.getTime() === today.getTime();
-
         const cell = document.createElement('div');
-        cell.className = 'day-cell' + (curMonth ? '' : ' other-month');
+        cell.className = 'week-hour-cell';
+        // Events whose time starts with this hour (HH:xx)
+        const hourStr = String(hour).padStart(2, '0');
+        (byDate[ds] || [])
+          .filter(ev => ev.time && ev.time.startsWith(hourStr + ':'))
+          .forEach(ev => cell.appendChild(makePill(ev, ds)));
         cell.addEventListener('click', () => openModal(ds, null));
-
-        const num = document.createElement('div');
-        num.className = 'day-cell-num' + (isToday ? ' today' : '');
-        num.textContent = date.getDate();
-        num.addEventListener('click', e => { e.stopPropagation(); openModal(ds, null); });
-        cell.appendChild(num);
-
-        (byDate[ds] || []).forEach(ev => {
-          const pill = document.createElement('div');
-          pill.className = 'event-pill';
-
-          const dot = document.createElement('span');
-          dot.className = 'event-dot';
-          dot.style.background = ALLOWED_COLORS.has(ev.color) ? ev.color : '#4285f4';
-
-          const label = document.createElement('span');
-          label.className = 'event-pill-label';
-          label.textContent = ev.time ? `${ev.time} ${ev.title}` : ev.title;
-
-          pill.appendChild(dot);
-          pill.appendChild(label);
-          pill.addEventListener('click', e => { e.stopPropagation(); openModal(ds, ev); });
-          cell.appendChild(pill);
-        });
-
         row.appendChild(cell);
       });
       gridBody.appendChild(row);
@@ -185,7 +231,7 @@
 
   /**
    * Re-renders the sidebar mini calendar for the `mini` month.
-   * Clicking a day jumps both the main grid and mini calendar to that month.
+   * Clicking a day jumps the main grid to the week containing that day.
    */
   function renderMini() {
     const { year, month } = mini;
@@ -199,8 +245,9 @@
       el.className = 'mini-day' + (isToday ? ' today' : '') + (!curMonth ? ' other' : '');
       el.textContent = date.getDate();
       el.addEventListener('click', () => {
+        currentWeekStart = getMondayOf(date);
         current = { year: date.getFullYear(), month: date.getMonth() };
-        mini = { ...current };
+        mini = { year: date.getFullYear(), month: date.getMonth() };
         renderGrid(); renderMini();
       });
       miniDays.appendChild(el);
@@ -218,17 +265,19 @@
 
   // ── Navigation ─────────────────────────────────────────────────────────────
   document.getElementById('prev').addEventListener('click', () => {
-    if (current.month === 0) { current.month = 11; current.year--; } else current.month--;
-    mini = { ...current }; renderGrid(); renderMini(); fetchGoogleEvents();
+    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    mini = { year: currentWeekStart.getFullYear(), month: currentWeekStart.getMonth() };
+    renderGrid(); renderMini(); fetchGoogleEvents();
   });
   document.getElementById('next').addEventListener('click', () => {
-    if (current.month === 11) { current.month = 0; current.year++; } else current.month++;
-    mini = { ...current }; renderGrid(); renderMini(); fetchGoogleEvents();
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    mini = { year: currentWeekStart.getFullYear(), month: currentWeekStart.getMonth() };
+    renderGrid(); renderMini(); fetchGoogleEvents();
   });
   document.getElementById('todayBtn').addEventListener('click', () => {
-    const t = new Date();
-    current = { year: t.getFullYear(), month: t.getMonth() };
-    mini = { ...current }; renderGrid(); renderMini(); fetchGoogleEvents();
+    currentWeekStart = getMondayOf(new Date());
+    mini = { year: currentWeekStart.getFullYear(), month: currentWeekStart.getMonth() };
+    renderGrid(); renderMini(); fetchGoogleEvents();
   });
 
   // ── Modal ──────────────────────────────────────────────────────────────────
@@ -354,13 +403,22 @@
   }
 
   /**
-   * Fetches Google Calendar events for the current month and re-renders the grid.
+   * Fetches Google Calendar events for the current week's month(s) and re-renders the grid.
+   * Fetches two months if the week spans a month boundary.
    */
   async function fetchGoogleEvents() {
     try {
-      const res = await fetch(`/api/google-events?year=${current.year}&month=${current.month + 1}`);
-      if (res.ok) googleEvents = await res.json();
-      else googleEvents = [];
+      const weekEnd = new Date(currentWeekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      const promises = [
+        fetch(`/api/google-events?year=${currentWeekStart.getFullYear()}&month=${currentWeekStart.getMonth() + 1}`).then(r => r.ok ? r.json() : [])
+      ];
+      // If week spans two months, fetch both
+      if (currentWeekStart.getMonth() !== weekEnd.getMonth()) {
+        promises.push(fetch(`/api/google-events?year=${weekEnd.getFullYear()}&month=${weekEnd.getMonth() + 1}`).then(r => r.ok ? r.json() : []));
+      }
+      const results = await Promise.all(promises);
+      googleEvents = results.flat();
     } catch { googleEvents = []; }
     renderGrid();
   }

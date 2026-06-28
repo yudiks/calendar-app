@@ -76,6 +76,19 @@
         <div class="cal-item"><span class="dot" style="background:#0b8043"></span> Work</div>
         <div class="cal-item"><span class="dot" style="background:#e67c73"></span> Birthdays</div>
       </div>
+
+      <!-- Share booking link -->
+      <div class="share-section">
+        <div class="share-title">Your booking page</div>
+        <p class="share-desc">Share this link so people can book time with you</p>
+        <div class="share-url-row">
+          <span class="share-url" id="shareUrl"></span>
+          <button class="copy-btn" id="copyBtn" title="Copy link">
+            <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          </button>
+        </div>
+        <a class="open-book-btn" id="openBookBtn" target="_blank">Open booking page ↗</a>
+      </div>
     </aside>
 
     <!-- ── Main calendar ── -->
@@ -127,6 +140,24 @@
   </div>
 </div>
 
+<script>
+  (function() {
+    const bookUrl = window.location.origin + '/book';
+    const shareUrl = document.getElementById('shareUrl');
+    const copyBtn = document.getElementById('copyBtn');
+    const openBookBtn = document.getElementById('openBookBtn');
+    if (shareUrl) shareUrl.textContent = bookUrl;
+    if (openBookBtn) openBookBtn.href = bookUrl;
+    if (copyBtn) copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(bookUrl).then(() => {
+        copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="#0b8043" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>';
+        setTimeout(() => {
+          copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>';
+        }, 2000);
+      });
+    });
+  })();
+</script>
 <script src="app.js"></script>
 </body>
 </html>
