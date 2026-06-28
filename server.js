@@ -109,7 +109,7 @@ app.get('/auth/google', (req, res) => {
 app.get('/auth/callback', async (req, res) => {
   try {
     const { code } = req.query;
-    if (!code) return res.redirect('/login.html?error=no_code');
+    if (!code) return res.redirect('/login?error=no_code');
     const oauth2Client = getOAuthClient();
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
@@ -128,7 +128,7 @@ app.get('/auth/callback', async (req, res) => {
     res.redirect('/');
   } catch (err) {
     console.error('OAuth callback error:', err);
-    res.redirect('/login.html?error=auth_failed');
+    res.redirect('/login?error=auth_failed');
   }
 });
 
@@ -249,5 +249,11 @@ app.get('/api/bookings', async (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve HTML pages at clean URLs (without .html extension)
+const PUBLIC = path.join(__dirname, 'public');
+app.get('/book',  (req, res) => res.sendFile(path.join(PUBLIC, 'book.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC, 'admin.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC, 'login.html')));
 
 app.listen(PORT, () => console.log(`Calendar app running at http://localhost:${PORT}`));
